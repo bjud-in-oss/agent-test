@@ -58,7 +58,7 @@ async function startServer() {
      const filePath = path.join(process.cwd(), filename);
      res.download(filePath);
   });
-  
+
   app.get("/api/workspace/read", async (req, res) => {
     try {
       const filepath = req.query.path as string;
@@ -95,22 +95,19 @@ async function startServer() {
   // ==========================================
   
   // Sätt ett standardvärde (det användaren ser första gången)
-  activePayload = `Du är H, en engagerande, pedagogisk och strukturerad interaktiv guide och diskussionsledare. Din uppgift är att hjälpa användaren att lära sig precis vad som helst – från religiösa handböcker och teknisk dokumentation till komplexa manualer och instruktioner på nätet. Du gör detta genom att hjälpa användaren att förbereda källor, ladda upp dem till NotebookLM, och sedan guida dem genom processen steg-för-steg.
+let activePayload = "Detta är standardinstruktionerna om inget har sparats.";
 
-FÖLJ DETTA SAMTALSFLÖDE KRONOLOGISKT (STEG-FÖR-STEG):
-1. Välkomnande: Hälsa användaren välkommen som Guiden H. Fråga i en trevlig ton vad de vill lära sig idag...
-2. Insamling: När användaren anger en URL, anropa verktyget \`extract_web_sources\`...
-3. NotebookLM: Anropa verktyget \`open_webpage\` med parametern url: "https://notebooklm.google.com/"...
-4. Prompt-coachning: Erbjud dig att skriva en skräddarsydd analysprompt...
-5. Interaktiv coachning: Låt användaren ställa frågor eller klistra in svar...`;
+  // Detta är personligheten. Den ändras aldrig och injiceras vid start.
+  const BASE_SYSTEM_INSTRUCTION = `Du är H, en engagerande, pedagogisk och strukturerad interaktiv guide. 
+Börja samtalet genom att trevligt hälsa på användaren. 
+Vänta sedan på att användaren ber dig läsa in instruktioner eller input. 
+När de gör det, anropa ALLTID verktyget 'fetch_live_input' för att läsa in arbetsbeskrivningen, och bekräfta sedan att du har förstått den.`;
 
   await createGeminiLiveMcpBridge({
     server,
     mcpServerPaths: ["./h-mcp-server.js", "./workspace-mcp-server.js"],
-    // Skicka en funktion istället för en sträng, så bryggan alltid kan hämta det senaste!
-    getSystemInstruction: () => activePayload,
-    // Låt bryggan kunna uppdatera variabeln när användaren klickar "Save to Server"
-    setSystemInstruction: (newPayload: string) => { activePayload = newPayload; }
+    getSystemInstruction: () => BASE_SYSTEM_INSTRUCTION, // Sätter personligheten
+    setSystemInstruction: (newPayload: string) => { activePayload = newPayload; } // Sparar bara payloaden i bakgrunden
   });
 
   server.listen(PORT, "0.0.0.0", () => {

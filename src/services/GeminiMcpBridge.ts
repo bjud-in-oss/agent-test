@@ -44,6 +44,11 @@ export async function createGeminiLiveMcpBridge({ server, mcpServerPaths = [], g
       name: "goToStep",
       description: "Ändra det aktuella steget i guiden visuellt i gränssnittet (0 till 4).",
       parameters: { type: Type.OBJECT, properties: { step: { type: Type.INTEGER } }, required: ["step"] }
+    },
+    {
+      name: "open_webpage",
+      description: "Opens a specific URL (like NotebookLM) in the user's browser.",
+      parameters: { type: Type.OBJECT, properties: { url: { type: Type.STRING } }, required: ["url"] }
     }
   ];
 
