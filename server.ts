@@ -95,7 +95,7 @@ async function startServer() {
   // ==========================================
   
   // Sätt ett standardvärde (det användaren ser första gången)
-let activePayload = "Detta är standardinstruktionerna om inget har sparats.";
+  activePayload = "Detta är standardinstruktionerna om inget har sparats.";
 
   // Detta är personligheten. Den ändras aldrig och injiceras vid start.
   const BASE_SYSTEM_INSTRUCTION = `Du är H, en engagerande, pedagogisk och strukturerad interaktiv guide. 

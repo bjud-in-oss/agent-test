@@ -8,9 +8,11 @@ interface HeaderProps {
   connecting: boolean;
   connect: () => void;
   disconnect: () => void;
+  activeAgent: "forlikas" | "forandra" | "vanda";
+  setActiveAgent: (agent: "forlikas" | "forandra" | "vanda") => void;
 }
 
-export function Header({ modelStatus, pushing, connected, connecting, connect, disconnect }: HeaderProps) {
+export function Header({ modelStatus, pushing, connected, connecting, connect, disconnect, activeAgent, setActiveAgent }: HeaderProps) {
   const [apiKey, setApiKey] = useState("");
 
   // Hämta nyckeln från localStorage när komponenten laddas
@@ -26,9 +28,33 @@ export function Header({ modelStatus, pushing, connected, connecting, connect, d
 
   return (
     <header className="flex flex-col lg:flex-row justify-between items-start lg:items-end border-b border-[#121212] pb-6 mb-4 lg:mb-8 shrink-0 gap-6 lg:gap-0">
-      <div className="max-w-xl">
-         <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#666] mb-2">Project: Ouroboros / Gemini-3.1-Flash-Live</p>
-         <h1 className="text-4xl lg:text-7xl font-serif font-light leading-none tracking-tight">Acoustic Priming</h1>
+      <div className="max-w-xl flex flex-col gap-3">
+         <div>
+            <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#666] mb-1">Project: Ouroboros 3.0 / Triad Pooling</p>
+            <h1 className="text-4xl lg:text-7xl font-serif font-light leading-none tracking-tight">Acoustic Priming</h1>
+         </div>
+
+         {/* Triad Agent Selector */}
+         <div className="flex bg-[#EBEAE4] border border-[#121212]/10 p-0.5 rounded-sm gap-0.5 self-start shrink-0">
+           <button 
+             onClick={() => setActiveAgent('forlikas')}
+             className={`px-3 py-1 text-[9px] uppercase font-bold tracking-wider rounded-sm transition-all duration-200 ${activeAgent === 'forlikas' ? 'bg-[#121212] text-white shadow-sm' : 'text-[#666] hover:text-[#121212]'}`}
+           >
+             förlikas
+           </button>
+           <button 
+             onClick={() => setActiveAgent('forandra')}
+             className={`px-3 py-1 text-[9px] uppercase font-bold tracking-wider rounded-sm transition-all duration-200 ${activeAgent === 'forandra' ? 'bg-[#121212] text-white shadow-sm' : 'text-[#666] hover:text-[#121212]'}`}
+           >
+             förändra
+           </button>
+           <button 
+             onClick={() => setActiveAgent('vanda')}
+             className={`px-3 py-1 text-[9px] uppercase font-bold tracking-wider rounded-sm transition-all duration-200 ${activeAgent === 'vanda' ? 'bg-[#121212] text-white shadow-sm' : 'text-[#666] hover:text-[#121212]'}`}
+           >
+             vända
+           </button>
+         </div>
       </div>
       
       <div className="flex flex-col lg:flex-row items-start lg:items-end gap-6 flex-1 lg:justify-end">

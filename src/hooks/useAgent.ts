@@ -35,6 +35,7 @@ export function useAgent(onToolCall?: (msg: any) => void) {
   const [executionOutputs, setExecutionOutputs] = useState<{command: string, stdout: string, stderr: string, error: string | null}[]>([]);
   const [modelStatus, setModelStatus] = useState<"idle" | "processing" | "fetching_payload" | "executing_code" | "speaking">("idle");
   const [activeCommand, setActiveCommand] = useState("");
+  const [activeAgent, setActiveAgent] = useState<"forlikas" | "forandra" | "vanda">("forlikas");
   
   // Startar med en laddningstext
   const [payloadText, setPayloadText] = useState("Laddar instruktioner från servern...");
@@ -126,7 +127,7 @@ export function useAgent(onToolCall?: (msg: any) => void) {
 
       const activeApiKey = localStorage.getItem("gemini_api_key") || "";
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${wsProtocol}//${window.location.host}/live-ws?apiKey=${encodeURIComponent(activeApiKey)}`;
+      const wsUrl = `${wsProtocol}//${window.location.host}/live-ws?agent=${activeAgent}&apiKey=${encodeURIComponent(activeApiKey)}`;
       
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
@@ -264,6 +265,18 @@ export function useAgent(onToolCall?: (msg: any) => void) {
     };
   }, [handlePushStart, handlePushEnd]);
 
+  // Handle automatic switching of agents when connected
+  useEffect(() => {
+    if (connected) {
+      addLog(`Switching stream to agent: ${activeAgent}...`);
+      disconnect();
+      const timer = setTimeout(() => {
+        connect();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [activeAgent]);
+
   useEffect(() => {
     return () => {
       disconnect();
@@ -287,6 +300,8 @@ export function useAgent(onToolCall?: (msg: any) => void) {
     connect,
     disconnect,
     handlePushStart,
-    handlePushEnd
+    handlePushEnd,
+    activeAgent,
+    setActiveAgent
   };
 }

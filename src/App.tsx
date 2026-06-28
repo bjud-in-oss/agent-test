@@ -46,7 +46,9 @@ export default function App() {
     connect,
     disconnect,
     handlePushStart,
-    handlePushEnd
+    handlePushEnd,
+    activeAgent,
+    setActiveAgent
   } = useAgent(handleToolCall); // Pass tool handler
 
   useEffect(() => {
@@ -64,6 +66,8 @@ export default function App() {
           connecting={connecting}
           connect={connect}
           disconnect={disconnect}
+          activeAgent={activeAgent}
+          setActiveAgent={setActiveAgent}
         />
 
         <main className="flex-1 flex flex-col lg:flex-row gap-6 lg:gap-12 min-h-0 overflow-y-auto lg:overflow-hidden">
