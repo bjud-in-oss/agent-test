@@ -89,7 +89,7 @@ FÖLJ DETTA SAMTALSFLÖDE KRONOLOGISKT (STEG-FÖR-STEG):
 
   await createGeminiLiveMcpBridge({
     server,
-    mcpServerPaths: ["./h-mcp-server.cjs"],
+    mcpServerPaths: ["./h-mcp-server.js", "./workspace-mcp-server.js"],
     // Skicka en funktion istället för en sträng, så bryggan alltid kan hämta det senaste!
     getSystemInstruction: () => activePayload,
     // Låt bryggan kunna uppdatera variabeln när användaren klickar "Save to Server"
