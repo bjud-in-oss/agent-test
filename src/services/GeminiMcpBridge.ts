@@ -97,6 +97,16 @@ export async function createGeminiLiveMcpBridge({ server, mcpServerPaths = [], g
         },
         callbacks: {
           onmessage: async (message: any) => {
+            // Fånga upp vad agenten säger i text
+            const agentText = message.serverContent?.outputTranscription?.text;
+            if (agentText) {
+              safeClientSend({ type: "transcription", text: agentText, role: "agent" });
+            }
+            // Fånga upp vad DU säger i mikrofonen (transkriberat)
+            const userText = message.serverContent?.inputTranscription?.text;
+            if (userText) {
+                safeClientSend({ type: "transcription", text: userText, role: "user" });
+            }
             // Skicka ljud och text till Frontend
             if (message.serverContent?.modelTurn?.parts) {
               for (const part of message.serverContent.modelTurn.parts) {
