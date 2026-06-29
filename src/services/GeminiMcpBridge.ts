@@ -39,6 +39,55 @@ export async function createGeminiLiveMcpBridge({ server, mcpServerPaths = [], g
 
   // Slå ihop alla MCP-verktyg + våra inbyggda UI-verktyg
   const allMcpTools = mcpClients.flatMap(c => c.tools);
+
+  function mapJsonSchemaToGeminiSchema(schema: any): any {
+    if (!schema) return undefined;
+    const clean: any = {};
+    
+    if (schema.type) {
+        const typeStr = schema.type.toLowerCase();
+        const typeMap: any = { 
+          'string': Type.STRING, 
+          'number': Type.NUMBER, 
+          'integer': Type.INTEGER, 
+          'boolean': Type.BOOLEAN, 
+          'array': Type.ARRAY, 
+          'object': Type.OBJECT 
+        };
+        clean.type = typeMap[typeStr] || Type.STRING;
+    }
+    if (schema.description) clean.description = schema.description;
+    
+    if (schema.properties && Object.keys(schema.properties).length > 0) {
+        clean.properties = {};
+        for (const key in schema.properties) {
+            clean.properties[key] = mapJsonSchemaToGeminiSchema(schema.properties[key]);
+        }
+    }
+    
+    if (schema.items) clean.items = mapJsonSchemaToGeminiSchema(schema.items);
+    if (Array.isArray(schema.required) && schema.required.length > 0) clean.required = schema.required;
+    
+    return clean;
+  }
+
+  const sanitizedMcpTools = allMcpTools.map(t => {
+    try {
+        const sanitizedParams = mapJsonSchemaToGeminiSchema(t.parameters);
+        const toolDef: any = {
+            name: t.name,
+            description: t.description || `Execute ${t.name}`,
+        };
+        // Skicka bara med parameters om det faktiskt finns properties att deklarera
+        if (sanitizedParams && sanitizedParams.properties && Object.keys(sanitizedParams.properties).length > 0) {
+            toolDef.parameters = sanitizedParams;
+        }
+        return toolDef;
+    } catch (err) {
+        return null;
+    }
+  }).filter((t): t is any => t !== null);
+
   const uiTools = [
     {
       name: "goToStep",
@@ -51,6 +100,10 @@ export async function createGeminiLiveMcpBridge({ server, mcpServerPaths = [], g
       parameters: { type: Type.OBJECT, properties: { url: { type: Type.STRING } }, required: ["url"] }
     }
   ];
+
+  const uniqueMcpTools = sanitizedMcpTools.filter(mcpTool => 
+      !uiTools.some(uiTool => uiTool.name === mcpTool.name)
+  );
 
   // ======================================================================
   // 2. POOL KONSTRUKTION OCH HANTERING (OUROBOROS TRIAD)
@@ -85,13 +138,13 @@ Din uppgift är att skriva kod, modifiera filer och exekvera kommandon i utveckl
 Du får ALDRIG producera röst eller tal (AUDIO) – din röstmodul är permanent avaktiverad. 
 Du kommunicerar uteslutande via text och genom att anropa lokala MCP-verktyg för att läsa/skriva filer eller köra kommandon. 
 All din feedback till användaren eller Förlikas ska ske i ren, saklig text.`;
-      modalities = ["TEXT"];
+      modalities = ["AUDIO"];
     } else if (agentKey === "vanda") {
       instruction = `Du är Vända (Omvärdering), en stum triad-medlem (MUTE) i Ouroboros 3.0. 
 Din uppgift är att analysera fel, köra tester, verifiera kodkvalitet och utvärdera systemstabilitet. 
 Du får ALDRIG producera röst eller tal (AUDIO) – din röstmodul är permanent avaktiverad. 
 Du kommunicerar uteslutande via text och genom att köra terminalkommandon eller tester via MCP-verktyg.`;
-      modalities = ["TEXT"];
+      modalities = ["AUDIO"];
     }
 
     const liveAi = new GoogleGenAI({ apiKey });
@@ -102,12 +155,7 @@ Du kommunicerar uteslutande via text och genom att köra terminalkommandon eller
           responseModalities: modalities as any,
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } },
           systemInstruction: instruction,
-          tools: [{ functionDeclarations: [...allMcpTools, ...uiTools] }],
-          contextWindowCompression: {
-             triggerTokens: 108000,
-             slidingWindow: { targetTokens: 64000 }
-          } as any,
-          outputAudioTranscription: {} as any,
+          tools: [{ functionDeclarations: [...uniqueMcpTools, ...uiTools] }],
           realtimeInputConfig: {
             automaticActivityDetection: { disabled: true }
           } as any
@@ -195,21 +243,18 @@ Du kommunicerar uteslutande via text och genom att köra terminalkommandon eller
             }
           }
         },
-        onclose: () => {
-          console.warn(`⚠️ [Ouroboros Bridge] Upstream Gemini Live connection closed for agent: ${agentKey}. Attempting re-establishment in 3 seconds...`);
-          setTimeout(() => {
-            if (sessionPool.has(agentKey)) {
-              startAgentSession(agentKey, apiKey).then(newSession => {
-                const entry = sessionPool.get(agentKey);
-                if (entry) {
-                  entry.session = newSession;
-                  console.log(`✅ [Ouroboros Bridge] Persistent connection re-established for agent: ${agentKey}`);
-                }
-              }).catch(err => {
-                console.error(`❌ [Ouroboros Bridge] Failed to re-establish connection for agent: ${agentKey}:`, err);
-              });
+        onclose: (e: any) => {
+          console.warn(`⚠️ [Ouroboros Bridge] Upstream Gemini Live connection closed for agent: ${agentKey}. Code: ${e?.code}, Reason: ${e?.reason}, WasClean: ${e?.wasClean}.`);
+          const entry = sessionPool.get(agentKey);
+          if (entry) {
+            if (entry.activeClientWs) {
+              try {
+                entry.activeClientWs.send(JSON.stringify({ type: "error", error: "Upstream connection closed by Gemini backend." }));
+                entry.activeClientWs.close();
+              } catch (err) {}
             }
-          }, 3000);
+            sessionPool.delete(agentKey);
+          }
         },
         onerror: (err: any) => {
           console.error(`❌ [Ouroboros Bridge] Error in upstream Gemini Live connection for agent ${agentKey}:`, err);
@@ -217,31 +262,23 @@ Du kommunicerar uteslutande via text och genom att köra terminalkommandon eller
       }
     });
 
+    console.log(`🟢 [API] Google Live Session ESTABLISHED for ${agentKey}`);
+
     return session;
   }
 
-  async function ensurePoolInitialized(apiKey: string) {
-    if (poolInitialized) return;
-    poolInitialized = true;
-    console.log("⚡ [Ouroboros Bridge] Creating persistent session pool for the Triad...");
-    try {
-      for (const key of ["forlikas", "forandra", "vanda"]) {
-        const sess = await startAgentSession(key, apiKey);
-        sessionPool.set(key, {
-          session: sess,
-          activeClientWs: null
-        });
-      }
-      console.log("🎯 [Ouroboros Bridge] Triad persistent pool initialized successfully!");
-    } catch (err) {
-      console.error("❌ [Ouroboros Bridge] Failed to initialize persistent pool:", err);
-      poolInitialized = false;
+  async function getOrCreateSession(agentName: string, apiKey: string): Promise<SessionEntry> {
+    let entry = sessionPool.get(agentName);
+    if (!entry || !entry.session) {
+      console.log(`⚡ [Ouroboros Bridge] Session for ${agentName} not found or inactive. Creating dynamically (JIT)...`);
+      const session = await startAgentSession(agentName, apiKey);
+      entry = {
+        session,
+        activeClientWs: null
+      };
+      sessionPool.set(agentName, entry);
     }
-  }
-
-  // Pre-initialize with process.env key if available
-  if (process.env.GEMINI_API_KEY) {
-    ensurePoolInitialized(process.env.GEMINI_API_KEY).catch(console.error);
+    return entry;
   }
 
   // ======================================================================
@@ -271,9 +308,6 @@ Du kommunicerar uteslutande via text och genom att köra terminalkommandon eller
       return;
     }
 
-    // Se till att poolen startas
-    await ensurePoolInitialized(activeApiKey);
-
     const agentName = searchParams.get("agent") || "forlikas";
     if (!["forlikas", "forandra", "vanda"].includes(agentName)) {
       safeClientSend({ type: "error", error: `Okänd agent: ${agentName}` });
@@ -281,9 +315,13 @@ Du kommunicerar uteslutande via text och genom att köra terminalkommandon eller
       return;
     }
 
-    const entry = sessionPool.get(agentName);
-    if (!entry || !entry.session) {
-      safeClientSend({ type: "error", error: `Session för ${agentName} har inte initierats ännu. Försök igen.` });
+    let entry: SessionEntry;
+    try {
+      safeClientSend({ type: "log", message: `Initierar session för ${agentName} (JIT)...` });
+      entry = await getOrCreateSession(agentName, activeApiKey);
+    } catch (err: any) {
+      console.error(`❌ [Ouroboros Bridge] Failed to get or create session for ${agentName}:`, err);
+      safeClientSend({ type: "error", error: `Kunde inte starta Gemini-session: ${err.message || err}` });
       clientWs.close();
       return;
     }

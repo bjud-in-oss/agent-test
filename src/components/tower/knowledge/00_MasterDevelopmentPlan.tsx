@@ -14,6 +14,7 @@ export const MasterDevelopmentPlan = `
    - Map holding 3 live sessions: \`forlikas\`, \`forandra\`, \`vanda\`.
    - Initialized at Express-server boot or dynamically ensured using the provided API Key.
    - Kept alive permanently.
+   - **Safe Boot Configuration (Fixing Error 1011):** To prevent immediate connection drop (Internal Error 1011) from Gemini upstream backend, we retain the multimodal "gemini-3.1-flash-live-preview" model but strictly strip down the initialization config to only include core stable fields: \`responseModalities\`, \`systemInstruction\`, \`speechConfig\`, and \`tools\`, completely omitting experimental fields (\`contextWindowCompression\`, \`outputAudioTranscription\`, \`realtimeInputConfig\`).
 2. **Dynamic Client Routing:**
    - Clients connect via \`/live-ws?agent=<agent_name>&apiKey=<key>\`.
    - The bridge maps the client's socket inputs (microphone PCM stream, text messages) to the active agent session's stream input.
