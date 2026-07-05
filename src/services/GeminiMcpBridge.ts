@@ -158,6 +158,9 @@ Du kommunicerar uteslutande via text och genom att köra terminalkommandon eller
           tools: [{ functionDeclarations: [...uniqueMcpTools, ...uiTools] }],
           realtimeInputConfig: {
             automaticActivityDetection: { disabled: true }
+          } as any,
+          outputAudioTranscription: {
+            model: "gemini-3.1-flash-live-preview"
           } as any
       },
       callbacks: {
